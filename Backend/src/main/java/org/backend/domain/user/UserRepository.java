@@ -1,4 +1,14 @@
 package org.backend.domain.user;
 
-public class UserRepository {
+import java.util.Optional;
+
+public interface UserRepository {
+
+    User save(User user);
+
+    Optional<User> findById(Long id);
+
+    Optional<User> findByEmail(String email);
+
+    void delete(User user);
 }

@@ -1,4 +1,6 @@
 package org.backend.domain.user;
 
-public class UserType {
+public enum UserType {
+    CUSTOMER,
+    EMPLOYEE
 }

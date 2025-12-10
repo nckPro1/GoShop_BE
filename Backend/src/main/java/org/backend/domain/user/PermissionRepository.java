@@ -1,4 +1,14 @@
 package org.backend.domain.user;
 
-public class PermissionRepository {
+import java.util.Optional;
+
+public interface PermissionRepository {
+
+    Permission save(Permission permission);
+
+    Optional<Permission> findById(Long id);
+
+    Optional<Permission> findByName(String name);
+
+    void delete(Permission permission);
 }
