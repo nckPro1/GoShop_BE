@@ -33,14 +33,14 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    // Bean này đã đúng cú pháp cho Spring Security 6
+
     @Bean
     public AuthenticationProvider authenticationProvider() {
         // 1. Khởi tạo bằng constructor có tham số (trust the compiler error)
-        // 2. Loại bỏ dòng gọi setter (vì phương thức setUserDetailsService không tồn tại)
+
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider(userDetailsService);
 
-        // Bỏ dòng này: authProvider.setUserDetailsService(userDetailsService);
+
 
         authProvider.setPasswordEncoder(passwordEncoder());
         return authProvider;
