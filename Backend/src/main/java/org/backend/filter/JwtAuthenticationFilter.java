@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.backend.service.JwtService;
+import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -13,6 +14,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+
 import java.io.IOException;
 
 @Component
@@ -20,53 +22,62 @@ import java.io.IOException;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
-    private final UserDetailsService userDetailsService; // CustomUserDetailsService
+    private final UserDetailsService userDetailsService;
+
+    /**
+     * 🟢 QUAN TRỌNG: Hàm này giúp bỏ qua Filter đối với các endpoint Auth.
+     * Nó ngăn chặn lỗi MalformedJwtException khi người dùng chưa đăng nhập
+     * hoặc gửi header Authorization rác lên trang login.
+     */
+    @Override
+    protected boolean shouldNotFilter(@NonNull HttpServletRequest request) throws ServletException {
+        // Nếu đường dẫn bắt đầu bằng /api/auth/, bỏ qua filter này ngay lập tức
+        return request.getServletPath().startsWith("/api/auth/");
+    }
 
     @Override
     protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
 
         final String authHeader = request.getHeader("Authorization");
         final String jwt;
         final String username;
 
-        // 1. Kiểm tra JWT có tồn tại không
+        // 1. Kiểm tra header. Nếu không có hoặc không đúng định dạng -> cho qua (để các filter sau xử lý)
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        // 2. Trích xuất Token và Username
+        // 2. Trích xuất token
         jwt = authHeader.substring(7);
-        username = jwtService.extractUsername(jwt);
 
-        // 3. Xác thực User
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+        // Thêm try-catch để an toàn hơn nữa (đề phòng token rác lọt qua shouldNotFilter ở các API khác)
+        try {
+            username = jwtService.extractUsername(jwt);
 
-            // Tải thông tin User từ Database
-            UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
+            // 3. Xác thực
+            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
 
-            // 4. Kiểm tra Token có hợp lệ không
-            if (jwtService.isTokenValid(jwt, userDetails)) {
-
-                // Tạo đối tượng xác thực (Authentication Token)
-                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                        userDetails,
-                        null,
-                        userDetails.getAuthorities() // Lấy Permissions động
-                );
-
-                // Gán chi tiết request cho đối tượng xác thực
-                authToken.setDetails(
-                        new WebAuthenticationDetailsSource().buildDetails(request)
-                );
-
-                // 5. Cập nhật Security Context (User được xác thực)
-                SecurityContextHolder.getContext().setAuthentication(authToken);
+                if (jwtService.isTokenValid(jwt, userDetails)) {
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            userDetails.getAuthorities()
+                    );
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
             }
+        } catch (Exception e) {
+            // Nếu token lỗi (hết hạn, sai định dạng...), ta không làm sập server.
+            // Ta chỉ đơn giản là không set Authentication, để request trôi đi như một "Anonymous user".
+            // Spring Security sẽ chặn nó sau nếu endpoint đó yêu cầu quyền hạn.
+            System.err.println("Lỗi xác thực JWT: " + e.getMessage());
         }
 
         filterChain.doFilter(request, response);
