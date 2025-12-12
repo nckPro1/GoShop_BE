@@ -2,6 +2,8 @@ package org.backend.service;
 
 import lombok.RequiredArgsConstructor;
 import org.backend.dto.LoginRequest;
+import org.backend.model.Permission;
+import org.backend.model.Role;
 import org.backend.model.User;
 import org.backend.repository.UserRepository;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -9,6 +11,9 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -30,7 +35,6 @@ public class AuthenticationService {
     // Hàm Đăng nhập (Authenticate)
     public String authenticate(LoginRequest request) {
 
-        // 1. Xác thực thông tin đăng nhập
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         request.getUsername(),
@@ -38,11 +42,18 @@ public class AuthenticationService {
                 )
         );
 
-        // 2. Nếu xác thực thành công, tải UserDetails
         UserDetails userDetails = userDetailsService.loadUserByUsername(request.getUsername());
+        User user = userRepository.findByUsername(request.getUsername()).get();
 
-        // 3. Tạo JWT (dùng username và Authorities/Permissions)
-        // Lưu ý: Các Authorities (Permissions) đã được tải trong UserPrincipal (Bước 5)
-        return jwtService.generateToken(userDetails);
+        Map<String, Object> extraClaims = new HashMap<>();
+        extraClaims.put("roles", user.getRoles().stream().map(Role::getName).toList());
+        extraClaims.put("permissions", user.getRoles().stream()
+                .flatMap(role -> role.getPermissions().stream())
+                .map(Permission::getName)
+                .toList()
+        );
+
+        return jwtService.generateToken(extraClaims, userDetails);
     }
+
 }

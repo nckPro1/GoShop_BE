@@ -2,6 +2,7 @@ package org.backend.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.backend.dto.LoginRequest;
+import org.backend.dto.LoginResponse; // Nhớ import cái này
 import org.backend.service.AuthenticationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -10,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/auth") // Đã cho phép public trong SecurityConfig
+@RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
@@ -18,15 +19,14 @@ public class AuthController {
 
     // API Đăng nhập
     @PostMapping("/login")
-    public ResponseEntity<String> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
+        // 1. Lấy chuỗi JWT từ service
         String jwt = authService.authenticate(request);
-        return ResponseEntity.ok(jwt); // Trả về JWT
-    }
 
-    // API Đăng ký (nếu cần)
-    // @PostMapping("/register")
-    // public ResponseEntity<User> register(@RequestBody User user) {
-    //     User registeredUser = authService.register(user);
-    //     return ResponseEntity.ok(registeredUser);
-    // }
+        // 2. Gói nó vào đối tượng LoginResponse
+        LoginResponse response = new LoginResponse(jwt);
+
+        // 3. Trả về đối tượng JSON { "token": "..." }
+        return ResponseEntity.ok(response);
+    }
 }
